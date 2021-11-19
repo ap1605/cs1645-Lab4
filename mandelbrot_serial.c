@@ -3,6 +3,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/unistd.h>
+#include <mpi.h>
 
 #define XMAX 2.0
 #define XMIN -2.0

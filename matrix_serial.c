@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/time.h>
+#include <mpi.h>
 
 #define		NROW	1024
 #define		NCOL	NROW

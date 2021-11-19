@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <sys/time.h>
 #include <mpi.h>
@@ -46,12 +47,15 @@ int main(int argc, char* argv[])
         }
     }
 
-    int my_rank;
-    int comm_sz;
-    int chunk;
-    int local_i;
+
+    //Added
+    int my_rank;    // processes id
+    int comm_sz;    // total number of processes
+    int chunk;      // amount of work for each process
 
 
+
+    //MPI_Status sts;
 
     MPI_Init(NULL, NULL);
 
@@ -61,7 +65,9 @@ int main(int argc, char* argv[])
 
     chunk = NROW/comm_sz;
 
-    local_i = chunk*my_rank;
+
+    int local_i = chunk*my_rank;
+    //int local_n = chunk*(my_rank+1);
 
     int local_temp[chunk][NROW];
     int local_out[chunk][NROW];
@@ -71,6 +77,7 @@ int main(int argc, char* argv[])
     gettimeofday(&startTime, NULL); /* START TIME */
 
     MPI_Scatter(&matrixA, chunk*NROW, MPI_INT, &local_a, chunk*NROW, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&matrixB, NROW*NCOL, MPI_INT, 0, MPI_COMM_WORLD);
 
     //A*B*C
     for(i=0;i<chunk;i++){
@@ -80,7 +87,6 @@ int main(int argc, char* argv[])
                 local_temp[i][j] += local_a[i][k] * matrixB[k][j];
             }
         }
-
         for(j=0; j<NCOL; j++) {
             for (k = 0; k < NROW; k++) {
                 // K iterates rows on matrixA and columns in matrixB
@@ -88,12 +94,22 @@ int main(int argc, char* argv[])
             }
         }
     }
+    if(my_rank == 0) printf("\n MAIN THREAD \n");
+
 
     MPI_Gather(&local_out, chunk*NROW, MPI_INT, &outputMatrix[local_i][0], chunk*NROW, MPI_INT, 0, MPI_COMM_WORLD);
 
+
     MPI_Finalize();
+
+    
+
+
+
     //Get the end time
     gettimeofday(&finishTime, NULL);  /* END TIME */
+
+
 
     //Calculate the interval length
     timeIntervalLength = (double)(finishTime.tv_sec-startTime.tv_sec) * 1000000

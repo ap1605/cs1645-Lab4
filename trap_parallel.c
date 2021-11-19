@@ -2,6 +2,7 @@
 #include <math.h>
 #include <time.h>
 #include <sys/time.h>
+#include <mpi.h>
 
 #define		NSTEPS	2000
 #define		P_START	0
@@ -30,19 +31,42 @@ int main() {
     p_current = P_START;
     area=0.0;
 
+    int my_rank, comm_sz, local_n, i_finish, local_i, from;
+  
+
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+
+    local_n = NSTEPS/comm_sz;
+    local_i = my_rank*local_n;
+    i_finish = local_i+local_n;
+    
     //Get the start time
     gettimeofday(&startTime, NULL);
-
-    for(i = 0; i < NSTEPS; i++)
+    double local_area = 0.0;
+    for(i = local_i; i < i_finish; i++)
     {
         p_current = i * step_size;
 
         f_result_low = polynomial(p_current);
         f_result_high = polynomial(p_current + step_size);
 
-        area += (f_result_low + f_result_high) * step_size / 2;
+       local_area += (f_result_low + f_result_high) * step_size / 2;
     }
 
+
+    if(my_rank != 0){
+        MPI_Send(&local_area, 1, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
+    }
+    else{
+        area+=local_area;
+        for(from = 1; from < comm_sz; from++){
+            MPI_Recv(&local_area, 1, MPI_DOUBLE, from, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            area += local_area;
+        }
+    }
+    MPI_Finalize();
     //Get the end time
     gettimeofday(&finishTime, NULL);  /* after time */
 
@@ -54,7 +78,7 @@ int main() {
     //Print the interval length
     printf("Interval length: %g msec.\n", timeIntervalLength);
 
-    printf("Result: %f \n",area);
+    if(my_rank == 0) printf("Result: %f \n",area);
 
     return 0;
 }

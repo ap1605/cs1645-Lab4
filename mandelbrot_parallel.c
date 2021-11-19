@@ -3,6 +3,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/unistd.h>
+#include <mpi.h>
 
 #define XMAX 2.0
 #define XMIN -2.0
@@ -35,15 +36,35 @@ int main() {
     double x0, y0, tempx;
     double dx, dy;
 
+    //Added
+    int my_rank;    // processes id
+    int comm_sz;    // total number of processes
+    int local_n;    // each processes end position
+    int local_i;    // each processes starting position
+    int chunk;      // amount of work for each process
+    double avg;     
+    int totalSum;
+    int localSum;
+
     //increments in the real and imaginary directions
     dx = (XMAX - XMIN) / N;
     dy = (YMAX - YMIN) / N;
+
+    MPI_Init(NULL, NULL);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+
+    chunk = N/comm_sz;
+    local_i = chunk*my_rank;
+    local_n = local_i+chunk;
 
 
     //Get the start time
     gettimeofday(&startTime, NULL); /* START TIME */
     //calculations for mandelbrot
-    for (i = 1; i <= N; i++) {
+    for (i = local_i+1; i <= local_n; i++) {
         for (j = 1; j <= N; j++) {
             // c_real
             x0 = XMAX -
@@ -69,21 +90,28 @@ int main() {
         }
     }
 
+
+
     // Normalize the result based on the avg value
-    double totalSum = 0.0;
-    double avg;
-    for (i = 0; i < N; i++) {
+    localSum = 0.0;
+    for (i = local_i; i < local_n; i++) {
         for (j = 0; j < N; j++) {
-            totalSum += (double) pixels[i][j];
+            localSum += (double) pixels[i][j];
         }
     }
+    totalSum = 0.0;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(&localSum, &totalSum, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
     avg = totalSum/(N*N);
 
-    for (i = 0; i < N; i++) {
+    for (i = local_i; i < local_n; i++) {
         for (j = 0; j < N; j++) {
             pixels[i][j]=pixels[i][j]/avg;
         }
     }
+
 
     //Get the end time
     gettimeofday(&finishTime, NULL);  /* END TIME */
@@ -94,6 +122,8 @@ int main() {
     timeIntervalLength = timeIntervalLength / 1000;
     //Print the interval length
     printf("Interval length: %g msec.\n", timeIntervalLength);
+
+    MPI_Finalize();
 
 
 #ifdef TEST_RESULTS
@@ -128,4 +158,3 @@ void printMandelBrot() {
         printf("\n");
     }
 }
-
